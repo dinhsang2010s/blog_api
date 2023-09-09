@@ -4,6 +4,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import mongoose from "mongoose";
 import bodyParser from "body-parser";
+import { errorHandler } from "./middlewares/error";
 dotenv.config();
 
 if (!process.env.PORT) {
@@ -17,8 +18,11 @@ app.use(cors());
 app.use(cookieParser());
 app.use(express.json());
 
-const PORT = process.env.PORT || 3000;
+//Error Middleware
+app.use(errorHandler);
 
+// Connect to DB and start server
+const PORT = process.env.PORT || 3000;
 mongoose.connect(`${process.env.MONGODB_URL}`).then(() => {
   console.log("Connected to mongodb!");
   app.listen(PORT, () => {

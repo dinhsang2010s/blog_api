@@ -1,21 +1,30 @@
 const bcrypt = require("bcrypt");
 import jwt from "jsonwebtoken";
-
-import { RegisterModel } from "../interfaces";
 import User, { UserModel } from "../models/user";
 
 export const registerUser = async (req: any, res: any) => {
   try {
-    const user: RegisterModel = req.body;
+    const { name, password, displayName } = req.body;
+
+    // Validation
+    if (!name || !password)
+      return res.status(400).json({ message: "Invalid username or password." });
+
+    if (password.length < 6)
+      return res
+        .status(400)
+        .json({ message: "Passwords must be at least 6 characters." });
+
     const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(user.password, salt);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
     await new User({
-      name: user.name,
-      displayName: user.displayName ?? user.name,
+      name,
+      displayName: displayName ?? name,
       password: hashedPassword,
     }).save();
 
-    res.sendStatus(200).json({ name: user.name });
+    res.sendStatus(200).json({ name });
   } catch (error: any) {
     res.status(500).json(error.message);
   }
@@ -29,18 +38,21 @@ const generateToken = (payload: any) => {
 
 export const loginUser = async (req: any, res: any) => {
   try {
-    const user = await User.findOne<UserModel>({ name: req.body.name });
-    if (!user) {
-      return res.status(401).json({ message: "User not found!" });
-    }
+    const { name, password } = req.body;
 
-    const password = await bcrypt.compare(req.body.password, user.password);
-    if (!password)
-      return res.status(401).json({ message: "Incorrect password!" });
+    // Validate Request
+    if (!name || !password)
+      return res.status(400).json({ message: "Please add name and password." });
+
+    const user = await User.findOne<UserModel>({ name });
+    if (!user) return res.status(401).json({ message: "User not found." });
+
+    const isPassword = await bcrypt.compare(password, user.password);
+    if (!isPassword)
+      return res.status(401).json({ message: "Incorrect password." });
 
     if (user && password) {
       const accessToken = generateToken({ id: user.id });
-
       res.status(200).json({
         type: "Bearer",
         accessToken,

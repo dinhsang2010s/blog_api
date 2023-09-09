@@ -7,7 +7,6 @@ export const verifyAccessToken = (req: any, res: any, next: any) => {
       res.status(401).json({ message: "Token is not valid." });
       req.user = user;
       next();
-    } else
-       res.status(401).json({ message: "You are not authentication!" });
+    } else res.status(401).json({ message: "You are not authentication." });
   });
 };
