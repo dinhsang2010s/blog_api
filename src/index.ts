@@ -19,7 +19,7 @@ app.use(cookieParser());
 app.use(express.json());
 
 //Error Middleware
-app.use(errorHandler);
+//app.use(errorHandler);
 
 // Connect to DB and start server
 const PORT = process.env.PORT || 3000;
