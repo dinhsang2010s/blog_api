@@ -27,6 +27,7 @@ export class CategoryController {
   constructor(private categoryService: CategoryService) {}
 
   @Get('')
+  @Public()
   @HttpCode(HttpStatus.OK)
   async getPagination(@Query() query: QueryPaginationDto) {
     return await this.categoryService.getPagination(query);
