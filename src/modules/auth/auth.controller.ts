@@ -1,16 +1,6 @@
-import {
-  Body,
-  Controller,
-  HttpCode,
-  HttpStatus,
-  Post,
-  Request,
-} from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import {
-  LoginDto,
-  RegisterDto,
-} from 'src/models/dtos/request.dtos/request.dtos';
+import { UpdateLoginRequest, UpdateRegisterRequest } from 'src/models/requests';
 import { Public } from 'src/guards/objects';
 import { ApiTags } from '@nestjs/swagger';
 
@@ -22,13 +12,13 @@ export class AuthController {
 
   @Post('register')
   @HttpCode(HttpStatus.OK)
-  async register(@Body() model: RegisterDto) {
+  async register(@Body() model: UpdateRegisterRequest) {
     return await this.authService.register(model);
   }
 
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  async login(@Body() model: LoginDto) {
+  async login(@Body() model: UpdateLoginRequest) {
     return await this.authService.login(model);
   }
 }

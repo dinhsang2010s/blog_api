@@ -1,15 +1,16 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { MongooseModule, SchemaOptions } from '@nestjs/mongoose';
 import { UserModule } from './modules/user/user.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { CategoryModule } from './modules/category/category.module';
 import { ArticleModule } from './modules/article/article.module';
+import { CommentModule } from './modules/comment/comment.module';
 import { APP_FILTER } from '@nestjs/core';
 import { AllExceptionsFilter } from './utils/all-exception.filter';
-import { UploadModule } from './modules/upload/upload.module';
+import config from './config';
 
 const options: SchemaOptions = {
   toJSON: {
@@ -26,11 +27,10 @@ const options: SchemaOptions = {
       isGlobal: true,
     }),
     MongooseModule.forRootAsync({
-      inject: [ConfigService],
       imports: [ConfigModule],
-      useFactory: (config: ConfigService) => ({
-        uri: config.get<string>('DB_URI'),
-        dbName: config.get<string>('DB_NAME'),
+      useFactory: () => ({
+        uri: config().database.url,
+        dbName: config().database.name,
         connectionFactory: (connection) => {
           connection.plugin((schema) => {
             schema.options.toJSON = {
@@ -56,7 +56,7 @@ const options: SchemaOptions = {
     UserModule,
     CategoryModule,
     ArticleModule,
-    UploadModule,
+    CommentModule,
   ],
   controllers: [AppController],
   providers: [

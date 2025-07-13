@@ -1,106 +1,120 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import {
-  CategoryDto,
-  QueryPaginationDto,
-} from 'src/models/dtos/request.dtos/request.dtos';
-import { ICategory } from 'src/models/dtos/response.dtos/category';
-import { Pagination } from 'src/models/dtos/response.dtos/pagination';
+import { UpdateCategoryRequest } from 'src/models/requests';
+import { ICategory } from 'src/models/dtos/category';
 import { CategoryInterface } from 'src/interfaces/category.interface';
 import { Category } from 'src/models/schemas/category.schema';
 import { ArticleService } from '../article/article.service';
+import { CategoryStatus } from 'src/models/enums';
 
 @Injectable()
 export class CategoryService implements CategoryInterface {
+  private readonly DEFAULT_ORDER_BY = 'createdAt';
+  private readonly DEFAULT_SORT_ORDER = -1;
+
   constructor(
     @InjectModel(Category.name)
-    private categories: Model<ICategory>,
-    private articleService: ArticleService,
+    private readonly categories: Model<ICategory>,
+    private readonly articleService: ArticleService,
   ) {}
 
-  async getPagination(
-    query: QueryPaginationDto,
-  ): Promise<Pagination<ICategory[]>> {
-    const { offset, pageSize, orderBy, q } = query;
-    const searchQ = {
-      name: {
-        $regex: q,
-        $options: 'i',
-      },
-    };
+  async get(q?: string, orderBy?: string): Promise<ICategory[]> {
+    const searchQuery = this.buildSearchQuery(q);
+    const sortQuery = this.buildSortQuery(orderBy);
 
-    const data = await this.categories.aggregate([
-      { $match: q ? searchQ : {} },
-      { $sort: { [orderBy || 'createdAt']: -1 } },
-      { $skip: parseInt(offset) },
-      { $limit: parseInt(pageSize) },
+    const pipeline: any[] = [
       {
-        $lookup: {
-          from: 'users',
-          let: { userId: { $toObjectId: '$createdBy' } },
-          pipeline: [
-            { $match: { $expr: { $and: [{ $eq: ['$_id', '$$userId'] }] } } },
-          ],
-          as: 'create',
+        $match: {
+          status: CategoryStatus.Active,
+          ...searchQuery,
         },
       },
-      { $unwind: { path: '$create', preserveNullAndEmptyArrays: true } },
       {
-        $lookup: {
-          from: 'users',
-          let: { userId: { $toObjectId: '$updatedBy' } },
-          pipeline: [
-            { $match: { $expr: { $and: [{ $eq: ['$_id', '$$userId'] }] } } },
-          ],
-          as: 'update',
+        $addFields: {
+          id: { $toString: '$_id' },
         },
       },
-      { $unwind: { path: '$update', preserveNullAndEmptyArrays: true } },
       {
-        $project: {
-          _id: 0,
-          id: '$_id',
-          name: 1,
-          createdBy: '$create.name',
-          updatedBy: '$update.name',
-          status: 1,
-          createdAt: 1,
-          updatedAt: 1,
-        },
+        $sort: sortQuery,
       },
-    ]);
+    ];
 
-    return {
-      data,
-      total: (await this.categories.countDocuments()) ?? 0,
-    };
+    return await this.categories.aggregate(pipeline);
   }
 
   async getById(id: string): Promise<ICategory> {
     return this.categories.findById(id);
   }
 
-  async update(catId: string, model: CategoryDto): Promise<ICategory> {
-    if (catId)
-      return this.categories.findByIdAndUpdate({ _id: catId }, model, {
-        new: true,
-      });
-    else {
-      const cat = await this.categories.findOne({ name: model.name });
-      if (cat)
-        throw new BadRequestException(
-          `Category [ ${model.name} ] already exists`,
-        );
-
-      return this.categories.create(model);
+  async update(
+    categoryId: string,
+    updateData: UpdateCategoryRequest,
+  ): Promise<ICategory> {
+    if (categoryId) {
+      return this.updateExistingCategory(categoryId, updateData);
+    } else {
+      return this.createNewCategory(updateData);
     }
   }
 
   async delete(catId: string): Promise<void> {
-    const count = await this.articleService.getCountByCategoryId(catId);
-    if (count > 0)
-      throw new BadRequestException('can not delete this category');
+    await this.validateCategoryDeletion(catId);
     await this.categories.deleteOne({ _id: catId });
+  }
+
+  private buildSearchQuery(q?: string) {
+    if (!q) return {};
+
+    return {
+      name: {
+        $regex: q,
+        $options: 'i',
+      },
+    };
+  }
+
+  private buildSortQuery(orderBy?: string) {
+    if (!orderBy) {
+      return { [this.DEFAULT_ORDER_BY]: this.DEFAULT_SORT_ORDER };
+    }
+
+    const [field, order] = orderBy.split(':');
+    const sortOrder = order === 'asc' ? 1 : -1;
+
+    return { [field]: sortOrder };
+  }
+
+  private async updateExistingCategory(
+    categoryId: string,
+    updateData: UpdateCategoryRequest,
+  ): Promise<ICategory> {
+    return this.categories.findByIdAndUpdate({ _id: categoryId }, updateData, {
+      new: true,
+    });
+  }
+
+  private async createNewCategory(
+    model: UpdateCategoryRequest,
+  ): Promise<ICategory> {
+    const existingCategory = await this.categories.findOne({
+      name: model.name,
+    });
+
+    if (existingCategory) {
+      throw new BadRequestException(
+        `Category [ ${model.name} ] already exists`,
+      );
+    }
+
+    return this.categories.create(model);
+  }
+
+  private async validateCategoryDeletion(catId: string): Promise<void> {
+    const articleCount = await this.articleService.getCountByCategoryId(catId);
+
+    if (articleCount > 0) {
+      throw new BadRequestException('Cannot delete this category');
+    }
   }
 }

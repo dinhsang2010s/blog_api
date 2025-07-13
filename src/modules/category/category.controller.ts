@@ -4,7 +4,6 @@ import {
   Delete,
   Get,
   HttpCode,
-  HttpException,
   HttpStatus,
   Param,
   Post,
@@ -15,11 +14,9 @@ import {
 import { Public } from 'src/guards/objects';
 import { ApiTags } from '@nestjs/swagger';
 import { CategoryService } from './category.service';
-import {
-  CategoryDto,
-  QueryPaginationDto,
-} from 'src/models/dtos/request.dtos/request.dtos';
-import { Status } from 'src/models/enums';
+import { UpdateCategoryRequest, UpdateQueryRequest } from 'src/models/requests';
+import { CategoryStatus } from 'src/models/enums';
+import { IUserRequest } from 'src/models/requests/user.request';
 
 @ApiTags('Category')
 @Controller('categories')
@@ -29,8 +26,8 @@ export class CategoryController {
   @Get('')
   @Public()
   @HttpCode(HttpStatus.OK)
-  async getPagination(@Query() query: QueryPaginationDto) {
-    return await this.categoryService.getPagination(query);
+  async get() {
+    return await this.categoryService.get();
   }
 
   @Get(':id')
@@ -42,12 +39,12 @@ export class CategoryController {
   @Post('')
   @HttpCode(HttpStatus.OK)
   async add(
-    @Request() req: Request & { user: RequestUser },
-    @Body() model: CategoryDto,
+    @Request() req: Request & { user: IUserRequest },
+    @Body() model: UpdateCategoryRequest,
   ) {
     return await this.categoryService.update('', {
       ...model,
-      status: model.status ?? Status.Running,
+      status: model.status ?? CategoryStatus.Active,
       createdBy: req.user.id,
       createdAt: new Date(),
     });
@@ -57,8 +54,8 @@ export class CategoryController {
   @HttpCode(HttpStatus.OK)
   async update(
     @Param('id') id: string,
-    @Body() model: CategoryDto,
-    @Request() req: Request & { user: RequestUser },
+    @Body() model: UpdateCategoryRequest,
+    @Request() req: Request & { user: IUserRequest },
   ) {
     return await this.categoryService.update(id, {
       ...model,
